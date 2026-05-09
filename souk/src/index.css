@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: #d4581a;
+    --brand-light: #f2874a;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-sand-100 text-sand-900 font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-sand-200;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-sand-400 rounded-full;
+  }
+}
+
+@layer components {
+  .shimmer {
+    background: linear-gradient(90deg, #edeae2 25%, #e2ded5 50%, #edeae2 75%);
+    background-size: 700px 100%;
+    animation: shimmer 1.6s infinite;
+  }
+
+  .page-transition {
+    @apply animate-fade-up;
+  }
+}
+
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
