@@ -10,24 +10,45 @@ import Input from '@/components/ui/Input'
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' })
   const [loading, setLoading] = useState(false)
-  const { login } = useAuthStore()
-  const { success } = useToast()
+  const [errors, setErrors] = useState({})
+  const { register } = useAuthStore()
+  const { success, error } = useToast()
   const navigate = useNavigate()
 
   function set(key) {
     return (e) => setForm(f => ({ ...f, [key]: e.target.value }))
   }
 
+  function validate() {
+    const e = {}
+    if (!form.name) e.name = 'Nom requis'
+    if (!form.email) e.email = 'Email requis'
+    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Email invalide'
+    if (!form.password) e.password = 'Mot de passe requis'
+    else if (form.password.length < 8) e.password = 'Minimum 8 caractères'
+    return e
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
+    const errs = validate()
+    if (Object.keys(errs).length) { setErrors(errs); return }
+
     setLoading(true)
-    await new Promise(r => setTimeout(r, 900))
-    login(
-      { id: 2, name: form.name, email: form.email, avatar: form.name[0]?.toUpperCase() || 'U', role: 'user' },
-      'mock_jwt_token'
-    )
-    success('🎉 Compte créé ! Bienvenue sur Souk')
-    navigate('/')
+    try {
+      await register({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+      })
+      success('🎉 Compte créé ! Vérifie ton email pour confirmer.')
+      navigate('/')
+    } catch (err) {
+      error(err.message || 'Erreur lors de la création du compte')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -41,13 +62,16 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <Input label="Prénom & Nom" type="text" placeholder="Kofi Mensah"
-            icon={User} value={form.name} onChange={set('name')} required />
+            icon={User} value={form.name} onChange={set('name')}
+            error={errors.name} required />
           <Input label="Email" type="email" placeholder="ton@email.com"
-            icon={Mail} value={form.email} onChange={set('email')} autoComplete="email" required />
+            icon={Mail} value={form.email} onChange={set('email')}
+            error={errors.email} autoComplete="email" required />
           <Input label="Téléphone" type="tel" placeholder="+229 XX XX XX XX"
             icon={Phone} value={form.phone} onChange={set('phone')} />
           <Input label="Mot de passe" type="password" placeholder="Minimum 8 caractères"
-            icon={Lock} value={form.password} onChange={set('password')} autoComplete="new-password" required />
+            icon={Lock} value={form.password} onChange={set('password')}
+            error={errors.password} autoComplete="new-password" required />
 
           <p className="text-xs text-sand-400">
             En créant un compte, tu acceptes nos{' '}

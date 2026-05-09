@@ -1,21 +1,22 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useAuthStore } from '@/store/authStore'
 import MainLayout from '@/layouts/MainLayout'
 import ProtectedRoute from '@/routes/ProtectedRoute'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 
 // Lazy-loaded pages for code splitting
-const HomePage       = lazy(() => import('@/pages/Home/HomePage'))
-const SearchPage     = lazy(() => import('@/pages/Search/SearchPage'))
-const ListingPage    = lazy(() => import('@/pages/Listing/ListingPage'))
-const LoginPage      = lazy(() => import('@/pages/Auth/LoginPage'))
-const RegisterPage   = lazy(() => import('@/pages/Auth/RegisterPage'))
-const PublishPage    = lazy(() => import('@/pages/Publish/PublishPage'))
-const MessagesPage   = lazy(() => import('@/pages/Messages/MessagesPage'))
-const ProfilePage    = lazy(() => import('@/pages/Profile/ProfilePage'))
-const FavoritesPage  = lazy(() => import('@/pages/Favorites/FavoritesPage'))
-const AdminPage      = lazy(() => import('@/pages/Admin/AdminPage'))
-const NotFoundPage   = lazy(() => import('@/pages/NotFound/NotFoundPage'))
+const HomePage      = lazy(() => import('@/pages/Home/HomePage'))
+const SearchPage    = lazy(() => import('@/pages/Search/SearchPage'))
+const ListingPage   = lazy(() => import('@/pages/Listing/ListingPage'))
+const LoginPage     = lazy(() => import('@/pages/Auth/LoginPage'))
+const RegisterPage  = lazy(() => import('@/pages/Auth/RegisterPage'))
+const PublishPage   = lazy(() => import('@/pages/Publish/PublishPage'))
+const MessagesPage  = lazy(() => import('@/pages/Messages/MessagesPage'))
+const ProfilePage   = lazy(() => import('@/pages/Profile/ProfilePage'))
+const FavoritesPage = lazy(() => import('@/pages/Favorites/FavoritesPage'))
+const AdminPage     = lazy(() => import('@/pages/Admin/AdminPage'))
+const NotFoundPage  = lazy(() => import('@/pages/NotFound/NotFoundPage'))
 
 function PageLoader() {
   return (
@@ -26,6 +27,12 @@ function PageLoader() {
 }
 
 export default function App() {
+  const init = useAuthStore((s) => s.init)
+
+  useEffect(() => {
+    init()
+  }, [])
+
   return (
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>

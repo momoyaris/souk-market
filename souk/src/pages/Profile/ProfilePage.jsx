@@ -1,28 +1,90 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Star, Plus, Settings, LogOut } from 'lucide-react'
+import { Star, Plus, Settings, LogOut, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { LISTINGS } from '@/utils/mockData'
-import { useFavoritesStore } from '@/store/favoritesStore'
+import { supabase } from '@/services/supabase'
 import ListingCard from '@/components/cards/ListingCard'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/hooks/useToast'
 
 const TABS = ['Mes annonces', 'Favoris', 'Messages']
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState(0)
+  const [myListings, setMyListings] = useState([])
+  const [favListings, setFavListings] = useState([])
+  const [loadingListings, setLoadingListings] = useState(true)
+  const [loadingFavs, setLoadingFavs] = useState(false)
   const { user, logout } = useAuthStore()
-  const { ids } = useFavoritesStore()
+  const { success, error } = useToast()
   const navigate = useNavigate()
 
-  const myListings = LISTINGS.slice(0, 4)
-  const favListings = LISTINGS.filter(l => ids.includes(l.id))
+  // Charger mes annonces
+  useEffect(() => {
+    async function fetchMyListings() {
+      if (!user) return
+      setLoadingListings(true)
+      const { data, error: err } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
 
-  function handleLogout() {
-    logout()
+      if (err) error(err.message)
+      else setMyListings(data || [])
+      setLoadingListings(false)
+    }
+    fetchMyListings()
+  }, [user])
+
+  // Charger les favoris quand on clique sur l'onglet
+  useEffect(() => {
+    async function fetchFavs() {
+      if (!user || activeTab !== 1) return
+      setLoadingFavs(true)
+      const { data, error: err } = await supabase
+        .from('favorites')
+        .select('listing:listings(*)')
+        .eq('user_id', user.id)
+
+      if (err) error(err.message)
+      else setFavListings(data?.map(f => f.listing) || [])
+      setLoadingFavs(false)
+    }
+    fetchFavs()
+  }, [user, activeTab])
+
+  async function handleLogout() {
+    await logout()
     navigate('/')
   }
+
+  async function handleDeleteListing(e, listingId) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm('Supprimer cette annonce ?')) return
+
+    const { error: err } = await supabase
+      .from('listings')
+      .delete()
+      .eq('id', listingId)
+
+    if (err) {
+      error('Erreur lors de la suppression')
+    } else {
+      setMyListings(l => l.filter(x => x.id !== listingId))
+      success('✅ Annonce supprimée')
+    }
+  }
+
+  // Nom depuis les metadata Supabase
+  const userName = user?.user_metadata?.name || user?.email || 'Utilisateur'
+  const userAvatar = userName[0]?.toUpperCase() || 'U'
+  const memberSince = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : ''
 
   return (
     <div className="page-transition max-w-4xl mx-auto px-4 md:px-6 py-8">
@@ -31,20 +93,22 @@ export default function ProfilePage() {
         className="bg-white rounded-3xl p-6 md:p-8 border border-sand-200 shadow-card flex flex-col sm:flex-row items-start sm:items-center gap-5 mb-8"
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       >
-        {/* Avatar */}
         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-2xl shrink-0">
-          {user?.avatar || 'U'}
+          {userAvatar}
         </div>
 
         <div className="flex-1">
-          <h1 className="font-serif text-2xl text-sand-900">{user?.name}</h1>
+          <h1 className="font-serif text-2xl text-sand-900">{userName}</h1>
           <div className="flex items-center gap-1.5 text-sm text-sand-400 mt-0.5">
             <Star size={13} className="fill-yellow-400 stroke-yellow-400" />
-            <span>4.9 · Membre depuis Jan 2025</span>
+            <span>Membre depuis {memberSince}</span>
           </div>
-          {/* Stats */}
           <div className="flex gap-6 mt-3">
-            {[['12', 'Annonces'], ['8', 'Vendus'], ['4.9', 'Note']].map(([n, l]) => (
+            {[
+              [myListings.length, 'Annonces'],
+              [myListings.filter(l => !l.is_active).length, 'Inactives'],
+              [favListings.length, 'Favoris'],
+            ].map(([n, l]) => (
               <div key={l} className="text-center">
                 <p className="font-bold text-sand-900 text-lg leading-none">{n}</p>
                 <p className="text-xs text-sand-400 mt-0.5">{l}</p>
@@ -53,7 +117,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => navigate('/publish')}>
             <Plus size={14} /> Nouvelle annonce
@@ -80,36 +143,60 @@ export default function ProfilePage() {
             }`}
           >
             {tab}
-            {tab === 'Favoris' && ids.length > 0 && (
+            {tab === 'Mes annonces' && myListings.length > 0 && (
               <span className="ml-1.5 bg-brand-100 text-brand-600 text-xs px-1.5 py-0.5 rounded-full">
-                {ids.length}
+                {myListings.length}
               </span>
             )}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* Tab — Mes annonces */}
       {activeTab === 0 && (
-        myListings.length > 0 ? (
+        loadingListings ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {myListings.map((l, i) => <ListingCard key={l.id} listing={l} index={i} />)}
+            {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+          </div>
+        ) : myListings.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {myListings.map((l, i) => (
+              <div key={l.id} className="relative">
+                <ListingCard listing={l} index={i} />
+                {/* Bouton supprimer */}
+                <button
+                  onClick={(e) => handleDeleteListing(e, l.id)}
+                  className="absolute bottom-16 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow transition-colors z-10"
+                  title="Supprimer"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
           </div>
         ) : (
-          <Empty icon="📦" msg="Tu n'as pas encore d'annonces" action={() => navigate('/publish')} actionLabel="Publier ma première annonce" />
+          <Empty icon="📦" msg="Tu n'as pas encore d'annonces"
+            action={() => navigate('/publish')} actionLabel="Publier ma première annonce" />
         )
       )}
 
+      {/* Tab — Favoris */}
       {activeTab === 1 && (
-        favListings.length > 0 ? (
+        loadingFavs ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+          </div>
+        ) : favListings.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {favListings.map((l, i) => <ListingCard key={l.id} listing={l} index={i} />)}
           </div>
         ) : (
-          <Empty icon="❤️" msg="Aucun favori pour l'instant" action={() => navigate('/')} actionLabel="Explorer les annonces" />
+          <Empty icon="❤️" msg="Aucun favori pour l'instant"
+            action={() => navigate('/')} actionLabel="Explorer les annonces" />
         )
       )}
 
+      {/* Tab — Messages */}
       {activeTab === 2 && (
         <div className="text-center py-12">
           <Button onClick={() => navigate('/messages')}>Ouvrir la messagerie</Button>

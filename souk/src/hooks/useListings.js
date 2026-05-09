@@ -1,35 +1,56 @@
 import { useState, useEffect } from 'react'
-import { LISTINGS } from '@/utils/mockData'
-
-// Swappable with real API: import { listingsService } from '@/services/api/listings'
+import { supabase } from '@/services/supabase'
 
 export function useListings(filters = {}) {
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
-    // Simulate network delay
-    const t = setTimeout(() => {
-      let result = [...LISTINGS]
+    async function fetchListings() {
+      setLoading(true)
+
+      let query = supabase
+        .from('listings')
+        .select(`
+          *,
+          user:profiles(id, name, avatar)
+        `)
+        .eq('is_active', true)
+        .eq('is_flagged', false)
+
+      // Filtres
       if (filters.category && filters.category !== 'all')
-        result = result.filter((l) => l.category === filters.category)
+        query = query.eq('category', filters.category)
+
       if (filters.query)
-        result = result.filter(
-          (l) =>
-            l.title.toLowerCase().includes(filters.query.toLowerCase()) ||
-            l.city.toLowerCase().includes(filters.query.toLowerCase())
+        query = query.or(
+          `title.ilike.%${filters.query}%,city.ilike.%${filters.query}%`
         )
+
       if (filters.maxPrice)
-        result = result.filter((l) => l.price <= filters.maxPrice)
+        query = query.lte('price', filters.maxPrice)
+
+      // Tri
       if (filters.sort === 'price_asc')
-        result.sort((a, b) => a.price - b.price)
-      if (filters.sort === 'price_desc')
-        result.sort((a, b) => b.price - a.price)
-      setListings(result)
+        query = query.order('price', { ascending: true })
+      else if (filters.sort === 'price_desc')
+        query = query.order('price', { ascending: false })
+      else
+        query = query.order('created_at', { ascending: false })
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Erreur chargement annonces:', error.message)
+        setListings([])
+      } else {
+        setListings(data || [])
+      }
+
       setLoading(false)
-    }, 400)
-    return () => clearTimeout(t)
+    }
+
+    fetchListings()
   }, [filters.category, filters.query, filters.maxPrice, filters.sort])
 
   return { listings, loading }
@@ -40,12 +61,29 @@ export function useListing(id) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
-    const t = setTimeout(() => {
-      setListing(LISTINGS.find((l) => l.id === Number(id)) || null)
+    async function fetchListing() {
+      setLoading(true)
+
+      const { data, error } = await supabase
+        .from('listings')
+        .select(`
+          *,
+          user:profiles(id, name, avatar)
+        `)
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        console.error('Erreur chargement annonce:', error.message)
+        setListing(null)
+      } else {
+        setListing(data)
+      }
+
       setLoading(false)
-    }, 300)
-    return () => clearTimeout(t)
+    }
+
+    if (id) fetchListing()
   }, [id])
 
   return { listing, loading }

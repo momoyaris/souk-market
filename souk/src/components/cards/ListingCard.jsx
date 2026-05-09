@@ -1,4 +1,4 @@
-import { Heart, MapPin } from 'lucide-react'
+import { Heart, MapPin, ImageOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useFavoritesStore } from '@/store/favoritesStore'
@@ -10,6 +10,9 @@ export default function ListingCard({ listing, index = 0 }) {
   const { toggle, isFav } = useFavoritesStore()
   const { toast } = useToast()
   const fav = isFav(listing.id)
+
+  // Première image ou fallback
+  const firstImage = listing.images?.[0] || null
 
   function handleFav(e) {
     e.preventDefault()
@@ -31,12 +34,31 @@ export default function ListingCard({ listing, index = 0 }) {
       >
         {/* Image */}
         <div className="relative w-full aspect-[4/3] bg-sand-200 flex items-center justify-center overflow-hidden">
-          <span className="text-5xl select-none" role="img" aria-label={listing.title}>
-            {listing.emoji}
-          </span>
+          {firstImage ? (
+            <img
+              src={firstImage}
+              alt={listing.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+              onError={(e) => {
+                e.target.style.display = 'none'
+                e.target.nextSibling.style.display = 'flex'
+              }}
+            />
+          ) : null}
 
-          {/* Badges */}
-          {listing.isNew && (
+          {/* Fallback si pas d'image ou erreur */}
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ display: firstImage ? 'none' : 'flex' }}
+          >
+            <ImageOff size={32} className="text-sand-400" />
+          </div>
+
+          {/* Badge nouveau — moins de 3 jours */}
+          {listing.created_at && (
+            new Date() - new Date(listing.created_at) < 3 * 24 * 60 * 60 * 1000
+          ) && (
             <span className="absolute top-2.5 left-2.5">
               <Badge variant="new">Nouveau</Badge>
             </span>
