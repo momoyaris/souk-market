@@ -1,2 +1,5 @@
-
-echo '{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}' > vercel.json
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
