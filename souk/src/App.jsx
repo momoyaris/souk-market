@@ -1,11 +1,10 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import MainLayout from '@/layouts/MainLayout'
 import ProtectedRoute from '@/routes/ProtectedRoute'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 
-// Lazy-loaded pages for code splitting
 const HomePage      = lazy(() => import('@/pages/Home/HomePage'))
 const SearchPage    = lazy(() => import('@/pages/Search/SearchPage'))
 const ListingPage   = lazy(() => import('@/pages/Listing/ListingPage'))
@@ -26,6 +25,12 @@ function PageLoader() {
   )
 }
 
+// Redirige vers / si déjà connecté
+function GuestRoute({ children }) {
+  const { isLoggedIn } = useAuthStore()
+  return isLoggedIn ? <Navigate to="/" replace /> : children
+}
+
 export default function App() {
   const init = useAuthStore((s) => s.init)
 
@@ -38,13 +43,17 @@ export default function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route element={<MainLayout />}>
+
+            {/* ── Routes publiques ── */}
             <Route path="/"            element={<HomePage />} />
             <Route path="/search"      element={<SearchPage />} />
             <Route path="/listing/:id" element={<ListingPage />} />
-            <Route path="/login"       element={<LoginPage />} />
-            <Route path="/register"    element={<RegisterPage />} />
 
-            {/* Protected routes */}
+            {/* ── Auth — redirige si déjà connecté ── */}
+            <Route path="/login"    element={<GuestRoute><LoginPage /></GuestRoute>} />
+            <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+
+            {/* ── Routes protégées ── */}
             <Route path="/publish" element={
               <ProtectedRoute><PublishPage /></ProtectedRoute>
             } />
@@ -58,7 +67,7 @@ export default function App() {
               <ProtectedRoute><FavoritesPage /></ProtectedRoute>
             } />
             <Route path="/admin" element={
-              <ProtectedRoute><AdminPage /></ProtectedRoute>
+              <ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>
             } />
 
             <Route path="*" element={<NotFoundPage />} />
